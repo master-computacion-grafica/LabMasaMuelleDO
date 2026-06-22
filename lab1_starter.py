@@ -28,7 +28,7 @@ indexes = ti.field(int, shape=triangles * 3)
 colors = ti.Vector.field(3, float, shape=n*n)
 
 #Parametros simulacion
-frame_dt = 0.01
+frame_dt = 0.016
 substeps = 150
 dt = frame_dt / substeps
 g = ti.Vector([0, -9.81, 0])
