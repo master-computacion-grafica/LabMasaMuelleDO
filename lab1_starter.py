@@ -22,6 +22,7 @@ colors = ti.Vector.field(3, float, shape=n*n)
 #Parametros simulacion
 dt = 0.01
 g = ti.Vector([0, -9.81, 0])
+k = 10
 
 @ti.kernel
 def generate_colors():
@@ -50,10 +51,16 @@ def step(): # Symplectic Euler
 
         F_amortiguamiento = ti.Vector([0.0, 0.0, 0.0])
 
+
         #Fuerza muelles estructurales (+ amortiguamiento)
         F_estructural = ti.Vector([0.0, 0.0, 0.0])
         for O in  ti.static([(-1,0), (1,0), (0,-1), (0,1)]):
             J = I + O
+            if 0 <= J[0] < n and 0 <= J[1] < n:
+                Pij = x[J] - x[I]
+                Pji = x[I] - x[J]
+                F_estructural += k * (Pij.norm() - cell_size) * Pij.normalized()
+                F_estructural -= k * (Pji.norm() - cell_size) * Pji.normalized()
 
 
         F = F_gravity + F_estructural
@@ -68,7 +75,7 @@ def step(): # Symplectic Euler
     v[0, n - 1] = [0, 0, 0]
 
     for i, j in x:
-        x[i, j] += v[i,j] * dt
+        x[i, j] += v[i, j] * dt
 
 @ti.kernel
 def update_vertices():
