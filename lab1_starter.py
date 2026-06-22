@@ -22,7 +22,7 @@ colors = ti.Vector.field(3, float, shape=n*n)
 #Parametros simulacion
 dt = 0.01
 g = ti.Vector([0, -9.81, 0])
-k = 10
+k = 2
 
 @ti.kernel
 def generate_colors():
@@ -54,7 +54,7 @@ def step(): # Symplectic Euler
 
         #Fuerza muelles estructurales (+ amortiguamiento)
         F_estructural = ti.Vector([0.0, 0.0, 0.0])
-        for O in  ti.static([(-1,0), (1,0), (0,-1), (0,1)]):
+        for O in ti.static([(-1,0), (1,0), (0,-1), (0,1)]):
             J = I + O
             if 0 <= J[0] < n and 0 <= J[1] < n:
                 Pij = x[J] - x[I]
@@ -62,8 +62,27 @@ def step(): # Symplectic Euler
                 F_estructural += k * (Pij.norm() - cell_size) * Pij.normalized()
                 F_estructural -= k * (Pji.norm() - cell_size) * Pji.normalized()
 
+        # Fuerza muelles deformacion (+ amortiguamiento)
+        F_deformacion = ti.Vector([0.0, 0.0, 0.0])
+        for O in ti.static([(-1, -1), (-1, 1), (1, -1), (1, 1)]):
+            J = I + O
+            if 0 <= J[0] < n and 0 <= J[1] < n:
+                Pij = x[J] - x[I]
+                Pji = x[I] - x[J]
+                F_deformacion += k * (Pij.norm() - cell_size) * Pij.normalized()
+                F_deformacion -= k * (Pji.norm() - cell_size) * Pji.normalized()
 
-        F = F_gravity + F_estructural
+        # Fuerza muelles flexion (+ amortiguamiento)
+        F_flexion = ti.Vector([0.0, 0.0, 0.0])
+        for O in ti.static([(-2,0), (2,0), (0,-2), (0,2)]):
+            J = I + O
+            if 0 <= J[0] < n and 0 <= J[1] < n:
+                Pij = x[J] - x[I]
+                Pji = x[I] - x[J]
+                F_flexion += k * (Pij.norm() - cell_size) * Pij.normalized()
+                F_flexion -= k * (Pji.norm() - cell_size) * Pji.normalized()
+
+        F = F_gravity + F_estructural + F_deformacion + F_flexion
         #Aceleracion
         a[I] = F / cell_mass
 
