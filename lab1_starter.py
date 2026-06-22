@@ -3,7 +3,7 @@ import taichi as ti
 ti.init(arch=ti.gpu)
 
 #Parameteros pieza de tela 1x1
-n = 150 #Numero de particulas en cada direccion
+n = 100 #Numero de particulas en cada direccion
 cell_size = 1.0 / (n - 1) #Distancia entre particulas
 cell_mass = 1.0 / (n * n)
 
@@ -21,11 +21,12 @@ colors = ti.Vector.field(3, float, shape=n*n)
 
 #Parametros simulacion
 frame_dt = 0.01
-substeps = 250
+substeps = 150
 dt = frame_dt / substeps
 g = ti.Vector([0, -9.81, 0])
 k = 200
 damp_c = 0.2
+air_c = 0.0001
 
 @ti.kernel
 def generate_colors():
@@ -92,8 +93,8 @@ def step(): # Symplectic Euler
                     F_flexion += k * (Pij.norm() - cell_size * 2) * Pij.normalized()
                     F_amortiguamiento += -damp_c * (Vij.dot(Pij.normalized())) * Pij.normalized()
 
-        F = F_gravity + F_estructural + F_deformacion + F_flexion + F_amortiguamiento
-
+        F_aire = -air_c * v[I]
+        F = F_gravity + F_estructural + F_deformacion + F_flexion + F_amortiguamiento + F_aire
         #Aceleracion
         a[I] = F / cell_mass
 
@@ -135,7 +136,7 @@ def init():
     generate_colors()
 
 def main():
-    window = ti.ui.Window("Bola 3D", (512, 512), fps_limit=60)
+    window = ti.ui.Window("Telita chuli", (512, 512), fps_limit=60)
     canvas = window.get_canvas()
     scene = window.get_scene()
 
