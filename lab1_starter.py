@@ -1,4 +1,5 @@
 import taichi as ti
+import random as rnd
 
 ti.init(arch=ti.gpu)
 
@@ -24,9 +25,12 @@ frame_dt = 0.01
 substeps = 150
 dt = frame_dt / substeps
 g = ti.Vector([0, -9.81, 0])
-k = 200
-damp_c = 0.2
-air_c = 0.0001
+k = 200 #Coeficiente del muelle
+damp_c = 0.2 #Coeficiente de amortiguamiento
+air_c = 0.0001 #Coeficiente de rozamiento
+wind_min = 0
+wind_max = 0.3
+wind_dir = ti.Vector([0.7, 0.1, 1]).normalized()
 
 @ti.kernel
 def generate_colors():
@@ -53,6 +57,7 @@ def calculate_indexes():
 
 @ti.kernel
 def step(): # Symplectic Euler
+    F_viento = wind_dir * ((ti.random(dtype=float) * wind_max) + wind_min) / substeps
     for I in ti.grouped(x):
         #Fuerzas (Recordar sumar las fuerzas pequeñas primero y las grandes después.)
         F_gravity = cell_mass * g
@@ -93,8 +98,9 @@ def step(): # Symplectic Euler
                     F_flexion += k * (Pij.norm() - cell_size * 2) * Pij.normalized()
                     F_amortiguamiento += -damp_c * (Vij.dot(Pij.normalized())) * Pij.normalized()
 
+        #Fuerza de rozamiento
         F_aire = -air_c * v[I]
-        F = F_gravity + F_estructural + F_deformacion + F_flexion + F_amortiguamiento + F_aire
+        F = F_gravity + F_estructural + F_deformacion + F_flexion + F_amortiguamiento + F_aire + F_viento
         #Aceleracion
         a[I] = F / cell_mass
 
