@@ -2,13 +2,14 @@ import random
 
 import taichi as ti
 import random as rnd
+import math
 
 import playsound as ps
 
 ti.init(arch=ti.gpu)
 
 #Parameteros pieza de tela 1x1
-n = 100 #Numero de particulas en cada direccion
+n = 128 #Numero de particulas en cada direccion
 cell_size = 1.0 / (n - 1) #Distancia entre particulas
 cell_mass = 1.0 / (n * n)
 
@@ -31,9 +32,11 @@ frame_dt = 0.01
 substeps = 150
 dt = frame_dt / substeps
 g = ti.Vector([0, -9.81, 0])
-k = 200 #Coeficiente del muelle
-damp_c = 0.2 #Coeficiente de amortiguamiento
-air_c = 0.0001 #Coeficiente de rozamiento
+k_e = 2 * n #Coeficiente del muelle
+k_f = (2 * n) / 2 #Coeficiente del muelle
+k_d = (2 * n) / math.sqrt(2) #Coeficiente del muelle
+d_m = (2 * n) * 10e-5 #Coeficiente de amortiguamiento
+d = 1.0 / (n * n) #Coeficiente de rozamiento
 wind_min = 0
 wind_max = 0.5
 wind_dir_max_angle = 10
@@ -119,8 +122,8 @@ def step(): # Symplectic Euler
                 Pij = x[J] - x[I]
                 if Pij.norm() > 1e-6:
                     Vij = v[I] - v[J]
-                    F_estructural += k * (Pij.norm() - cell_size) * Pij.normalized()
-                    F_amortiguamiento += -damp_c * (Vij.dot(Pij.normalized())) * Pij.normalized()
+                    F_estructural += k_e * (Pij.norm() - cell_size) * Pij.normalized()
+                    F_amortiguamiento += -d_m * (Vij.dot(Pij.normalized())) * Pij.normalized()
 
         # Fuerza muelles deformacion (+ amortiguamiento)
         F_deformacion = ti.Vector([0.0, 0.0, 0.0])
@@ -131,8 +134,8 @@ def step(): # Symplectic Euler
                 if Pij.norm() > 1e-6:
                     Vij = v[I] - v[J]
                     L = ti.sqrt((cell_size ** 2) + (cell_size ** 2))
-                    F_deformacion += k * (Pij.norm() - L) * Pij.normalized()
-                    F_amortiguamiento += -damp_c * (Vij.dot(Pij.normalized())) * Pij.normalized()
+                    F_deformacion += k_d * (Pij.norm() - L) * Pij.normalized()
+                    F_amortiguamiento += -d_m * (Vij.dot(Pij.normalized())) * Pij.normalized()
 
         # Fuerza muelles flexion (+ amortiguamiento)
         F_flexion = ti.Vector([0.0, 0.0, 0.0])
@@ -142,11 +145,11 @@ def step(): # Symplectic Euler
                 Pij = x[J] - x[I]
                 if Pij.norm() > 1e-6:
                     Vij = v[I] - v[J]
-                    F_flexion += k * (Pij.norm() - cell_size * 2) * Pij.normalized()
-                    F_amortiguamiento += -damp_c * (Vij.dot(Pij.normalized())) * Pij.normalized()
+                    F_flexion += k_f * (Pij.norm() - cell_size * 2) * Pij.normalized()
+                    F_amortiguamiento += -d_m * (Vij.dot(Pij.normalized())) * Pij.normalized()
 
         #Fuerza de rozamiento
-        F_aire = -air_c * v[I]
+        F_aire = -d * v[I]
         F = F_gravity + F_estructural + F_deformacion + F_flexion + F_amortiguamiento + F_aire + F_viento
         #Aceleracion
         a[I] = F / cell_mass
