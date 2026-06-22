@@ -3,7 +3,7 @@ import taichi as ti
 ti.init(arch=ti.gpu)
 
 #Parameteros pieza de tela 1x1
-n = 15 #Numero de particulas en cada direccion
+n = 50 #Numero de particulas en cada direccion
 cell_size = 1.0 / (n - 1) #Distancia entre particulas
 cell_mass = 1.0 / (n * n)
 
@@ -20,9 +20,10 @@ indexes = ti.field(int, shape=triangles * 3)
 colors = ti.Vector.field(3, float, shape=n*n)
 
 #Parametros simulacion
-dt = 0.01
+dt = 0.003
 g = ti.Vector([0, -9.81, 0])
-k = 2
+k = 10
+damp_c = 0.007
 
 @ti.kernel
 def generate_colors():
@@ -58,9 +59,10 @@ def step(): # Symplectic Euler
             J = I + O
             if 0 <= J[0] < n and 0 <= J[1] < n:
                 Pij = x[J] - x[I]
-                Pji = x[I] - x[J]
-                F_estructural += k * (Pij.norm() - cell_size) * Pij.normalized()
-                F_estructural -= k * (Pji.norm() - cell_size) * Pji.normalized()
+                if Pij.norm() > 1e-6:
+                    Vij = v[I] - v[J]
+                    F_estructural += k * (Pij.norm() - cell_size) * Pij.normalized()
+                    F_amortiguamiento += -damp_c * (Vij.dot(Pij.normalized())) * Pij.normalized()
 
         # Fuerza muelles deformacion (+ amortiguamiento)
         F_deformacion = ti.Vector([0.0, 0.0, 0.0])
@@ -68,21 +70,25 @@ def step(): # Symplectic Euler
             J = I + O
             if 0 <= J[0] < n and 0 <= J[1] < n:
                 Pij = x[J] - x[I]
-                Pji = x[I] - x[J]
-                F_deformacion += k * (Pij.norm() - cell_size) * Pij.normalized()
-                F_deformacion -= k * (Pji.norm() - cell_size) * Pji.normalized()
+                if Pij.norm() > 1e-6:
+                    Vij = v[I] - v[J]
+                    L = ti.sqrt((cell_size ** 2) + (cell_size ** 2))
+                    F_deformacion += k * (Pij.norm() - L) * Pij.normalized()
+                    F_amortiguamiento += -damp_c * (Vij.dot(Pij.normalized())) * Pij.normalized()
+
 
         # Fuerza muelles flexion (+ amortiguamiento)
         F_flexion = ti.Vector([0.0, 0.0, 0.0])
         for O in ti.static([(-2,0), (2,0), (0,-2), (0,2)]):
             J = I + O
-            if 0 <= J[0] < n and 0 <= J[1] < n:
+            if 0 <= J[0] < n and 0 <= J[1] < n :
                 Pij = x[J] - x[I]
-                Pji = x[I] - x[J]
-                F_flexion += k * (Pij.norm() - cell_size) * Pij.normalized()
-                F_flexion -= k * (Pji.norm() - cell_size) * Pji.normalized()
+                if Pij.norm() > 1e-6:
+                    Vij = v[I] - v[J]
+                    F_flexion += k * (Pij.norm() - cell_size * 2) * Pij.normalized()
+                    F_amortiguamiento += -damp_c * (Vij.dot(Pij.normalized())) * Pij.normalized()
 
-        F = F_gravity + F_estructural + F_deformacion + F_flexion
+        F = F_gravity + F_estructural + F_deformacion + F_flexion + F_amortiguamiento
         #Aceleracion
         a[I] = F / cell_mass
 
