@@ -3,7 +3,7 @@ import taichi as ti
 ti.init(arch=ti.gpu)
 
 #Parameteros pieza de tela 1x1
-n = 50 #Numero de particulas en cada direccion
+n = 150 #Numero de particulas en cada direccion
 cell_size = 1.0 / (n - 1) #Distancia entre particulas
 cell_mass = 1.0 / (n * n)
 
@@ -21,11 +21,11 @@ colors = ti.Vector.field(3, float, shape=n*n)
 
 #Parametros simulacion
 frame_dt = 0.01
-substeps = 15
+substeps = 250
 dt = frame_dt / substeps
 g = ti.Vector([0, -9.81, 0])
-k = 50
-damp_c = 0.007
+k = 200
+damp_c = 0.2
 
 @ti.kernel
 def generate_colors():
@@ -102,7 +102,7 @@ def step(): # Symplectic Euler
         v[I] += a[I]*dt
 
     v[0, 0] = [0, 0, 0]
-    v[0, n - 1] = [0, 0, 0]
+    v[n - 1, 0] = [0, 0, 0]
 
     for i, j in x:
         x[i, j] += v[i, j] * dt
@@ -140,7 +140,7 @@ def main():
     scene = window.get_scene()
 
     camera = ti.ui.Camera()
-    camera.position(0.0, 0.0, 3.0)
+    camera.position(0.0, 0.0, 1.5)
     camera.lookat(0.0, 0.0, 0.0)
     scene.set_camera(camera)
 
@@ -156,10 +156,10 @@ def main():
         camera.track_user_inputs(window, movement_speed=0.03, hold_key=ti.ui.RMB)
         scene.set_camera(camera)
 
-        scene.point_light((0., 1., 2.), (1., 1., 1.))
+        scene.point_light(ball_center[0], (1., 1., 1.)) # (0., 1., 2.)
         scene.ambient_light((0.5, 0.5, 0.5))
 
-        scene.particles(ball_center, radius=ball_radius, color=ball_color)
+        #scene.particles(ball_center, radius=ball_radius, color=ball_color)
         scene.mesh(vertices, indexes, per_vertex_color=colors, show_wireframe=False)
 
         canvas.scene(scene)
