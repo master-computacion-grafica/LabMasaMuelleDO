@@ -20,9 +20,11 @@ indexes = ti.field(int, shape=triangles * 3)
 colors = ti.Vector.field(3, float, shape=n*n)
 
 #Parametros simulacion
-dt = 0.003
+frame_dt = 0.01
+substeps = 15
+dt = frame_dt / substeps
 g = ti.Vector([0, -9.81, 0])
-k = 10
+k = 50
 damp_c = 0.007
 
 @ti.kernel
@@ -32,18 +34,22 @@ def generate_colors():
             colors[i * n + j] = 1.0
         else:
             colors[i * n + j] = (0.0, 0.4, 0.94)
+
 @ti.kernel
 def calculate_indexes():
     for i, j in ti.ndrange(n-1, n-1): #Recorro los cuadrados
         quad_id = i * (n - 1) + j
+
         #Rellernar indices primer triangulo
         indexes[quad_id * 6 + 0] = i * n + j
         indexes[quad_id * 6 + 1] = (i + 1) * n + j
         indexes[quad_id * 6 + 2] = i * n + j + 1
+
         # Rellernar indices segundo triangulo
         indexes[quad_id * 6 + 3] = i * n + j + 1
         indexes[quad_id * 6 + 4] = (i + 1) * n + j
         indexes[quad_id * 6 + 5] = (i + 1) * n + j + 1
+
 @ti.kernel
 def step(): # Symplectic Euler
     for I in ti.grouped(x):
@@ -51,7 +57,6 @@ def step(): # Symplectic Euler
         F_gravity = cell_mass * g
 
         F_amortiguamiento = ti.Vector([0.0, 0.0, 0.0])
-
 
         #Fuerza muelles estructurales (+ amortiguamiento)
         F_estructural = ti.Vector([0.0, 0.0, 0.0])
@@ -76,7 +81,6 @@ def step(): # Symplectic Euler
                     F_deformacion += k * (Pij.norm() - L) * Pij.normalized()
                     F_amortiguamiento += -damp_c * (Vij.dot(Pij.normalized())) * Pij.normalized()
 
-
         # Fuerza muelles flexion (+ amortiguamiento)
         F_flexion = ti.Vector([0.0, 0.0, 0.0])
         for O in ti.static([(-2,0), (2,0), (0,-2), (0,2)]):
@@ -89,6 +93,7 @@ def step(): # Symplectic Euler
                     F_amortiguamiento += -damp_c * (Vij.dot(Pij.normalized())) * Pij.normalized()
 
         F = F_gravity + F_estructural + F_deformacion + F_flexion + F_amortiguamiento
+
         #Aceleracion
         a[I] = F / cell_mass
 
@@ -123,13 +128,11 @@ ball_center = ti.Vector.field(3, dtype=float, shape=1)
 ball_radius = 0.3
 ball_color = (0.5, 0.42, 0.8)
 
-
 def init():
     ball_center[0] = ti.Vector([0, 0, 0])
     init_cloth()
     calculate_indexes()
     generate_colors()
-
 
 def main():
     window = ti.ui.Window("Bola 3D", (512, 512), fps_limit=60)
@@ -145,7 +148,8 @@ def main():
 
     while window.running:
         #Simulacion
-        step()
+        for _ in range(substeps):
+            step()
 
         #Renderizado
         update_vertices()
@@ -160,7 +164,6 @@ def main():
 
         canvas.scene(scene)
         window.show()
-
 
 if __name__ == "__main__":
     main()
