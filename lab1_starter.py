@@ -1,8 +1,10 @@
 import random
 
 import taichi as ti
+import numpy as np
 import random as rnd
 import math
+import cv2
 
 import playsound as ps
 
@@ -216,7 +218,18 @@ def main():
 
     ps.playsound("pirate_sound.mp3", block=False)
 
-    while window.running:
+    # fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    # video = cv2.VideoWriter('video.mp4', fourcc, 30, (512, 512))
+    #
+    # for i in range(1457):
+    #     img = cv2.imread(f"./resultados/frames/{i:06}.png")
+    #     video.write(img)
+    #     print(i)
+    #
+    # cv2.destroyAllWindows()
+    # video.release()
+
+    while window.running or not window.is_pressed(ti.ui.ESCAPE):
         #Simulacion
         for _ in range(substeps):
             step()
@@ -235,6 +248,8 @@ def main():
 
         canvas.scene(scene)
         window.show()
+
+
 
 if __name__ == "__main__":
     main()
